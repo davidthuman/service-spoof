@@ -1,49 +1,79 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
-	"net/http"
-	"net/http/httputil"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/davidthuman/service-spoof/internal/config"
+	"github.com/davidthuman/service-spoof/internal/database"
+	"github.com/davidthuman/service-spoof/internal/server"
 )
 
-func loggerMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		dump, err := httputil.DumpRequest(r, true)
-		if err != nil {
-			http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
-		}
-		log.Println(r.RemoteAddr, string(dump))
-		next.ServeHTTP(w, r)
-	})
-}
-
-func apache2Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=iso-8859-1")
-		w.Header().Set("Server", "Apache/2.4.63 (Unix)")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func defaultHandler404(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	content, err := os.ReadFile("./services/apache2/404.html")
-	if err != nil {
-		http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
-	}
-	w.Write(content)
-
-}
-
 func main() {
+	// Load configuration
+	cfg, err := config.LoadConfig("./config.yaml")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
-	defaultHandler := http.HandlerFunc(defaultHandler404)
+	log.Printf("Loaded configuration version %s", cfg.Version)
 
-	http.Handle("/", apache2Middleware(loggerMiddleware(defaultHandler)))
+	// Initialize database
+	db, err := database.New(cfg.Database.Path)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer db.Close()
 
-	fmt.Println("Server running on :8070")
-	log.Fatal(http.ListenAndServe(":8070", nil))
+	if err := db.Initialize(); err != nil {
+		log.Fatalf("Failed to create database schema: %v", err)
+	}
 
+	log.Printf("Database initialized at %s", cfg.Database.Path)
+
+	// Create request logger
+	requestLogger := database.NewRequestLogger(db)
+
+	// Create server manager
+	manager, err := server.NewManager(cfg, requestLogger)
+	if err != nil {
+		log.Fatalf("Failed to create server manager: %v", err)
+	}
+
+	// Start servers
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		if err := manager.Start(ctx); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	log.Println("Service spoof started successfully")
+	portServiceMap := manager.GetPortServiceMap()
+	for port, services := range portServiceMap {
+		log.Printf("Port %d: %v", port, services)
+	}
+
+	// Wait for shutdown signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	<-sigChan
+
+	log.Println("Shutting down...")
+
+	// Graceful shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := manager.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Shutdown error: %v", err)
+	}
+
+	log.Println("Shutdown complete")
 }

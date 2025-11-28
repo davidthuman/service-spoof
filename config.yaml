@@ -1,0 +1,78 @@
+version: "1.0"
+
+database:
+  path: "./data/service-spoof.db"
+
+services:
+  # Apache 2.4 Service
+  - name: "apache2"
+    type: "apache2"
+    enabled: true
+    ports: [8070]
+    headers:
+      Server: "Apache/2.4.63 (Unix)"
+      Content-Type: "text/html; charset=iso-8859-1"
+    endpoints:
+      - path: "/*"
+        method: "*"
+        status: 404
+        template: "./services/apache2/404.html"
+
+  # Nginx Service
+  - name: "nginx"
+    type: "nginx"
+    enabled: true
+    ports: [8090]
+    headers:
+      Server: "nginx/1.25.3"
+      Content-Type: "text/html"
+    endpoints:
+      - path: "/"
+        method: "GET"
+        status: 200
+        template: "./services/nginx/index.html"
+      - path: "/*"
+        method: "*"
+        status: 404
+        template: "./services/nginx/404.html"
+
+  # WordPress Service
+  - name: "wordpress"
+    type: "wordpress"
+    enabled: true
+    ports: [8100]
+    headers:
+      Server: "Apache/2.4.63 (Unix)"
+      X-Powered-By: "PHP/8.2.0"
+      Content-Type: "text/html; charset=UTF-8"
+    endpoints:
+      - path: "/wp-login.php"
+        method: "GET"
+        status: 200
+        template: "./services/wordpress/wp-login.html"
+      - path: "/"
+        method: "GET"
+        status: 200
+        template: "./services/wordpress/index.html"
+      - path: "/*"
+        method: "*"
+        status: 404
+        template: "./services/apache2/404.html"
+
+  # IIS Service (disabled by default)
+  - name: "iis"
+    type: "iis"
+    enabled: false
+    ports: [8110]
+    headers:
+      Server: "Microsoft-IIS/10.0"
+      X-Powered-By: "ASP.NET"
+    endpoints:
+      - path: "/"
+        method: "GET"
+        status: 200
+        template: "./services/iis/default.html"
+      - path: "/*"
+        method: "*"
+        status: 404
+        template: "./services/iis/404.html"
