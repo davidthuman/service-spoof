@@ -76,3 +76,17 @@ services:
         method: "*"
         status: 404
         template: "./services/iis/404.html"
+
+  - name: "gunicorn"
+    type: "generic"
+    enabled: true
+    ports: [8080]
+    headers:
+      Server: "gunicorn"
+    endpoints:
+      - path: "/"
+        method: "GET"
+        status: 404
+      - path: "/api/users"
+        method: "GET"
+        status: 403

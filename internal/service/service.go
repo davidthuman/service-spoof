@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/davidthuman/service-spoof/internal/config"
@@ -37,6 +36,6 @@ func NewService(cfg *config.ServiceConfig) (Service, error) {
 	case "iis":
 		return NewIISService(cfg)
 	default:
-		return nil, fmt.Errorf("unknown service type: %s", cfg.Type)
+		return NewGenericService(cfg)
 	}
 }
