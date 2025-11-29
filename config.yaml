@@ -90,3 +90,5 @@ services:
       - path: "/api/users"
         method: "GET"
         status: 403
+        headers:
+          X-API-Gateway: "jwt"
