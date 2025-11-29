@@ -4,7 +4,7 @@ I am going to try out Claude Code and more generally AI-assisted features.
 
 I have previously developed with GitHub's CoPilot (for a very short time), but I did not really dive in deep or really let the AI free. I also was not in the position, as a junior developers, to stunt my learning by allowing an AI to do a percentage of my coding.
 
-Add contributions made my Claude Code will have the commit author with the same name (using the `--author "Claude Code<code@claude.ai>"` option on the `git commit` command).
+Add contributions made by Claude Code will have the commit author as Claude (using the `--author "Claude <noreply@anthropic.com>"` option on the `git commit` command).
 
 ## How I Will Act
 
@@ -29,6 +29,12 @@ It also implement un-necessary private fields for service and a getter function 
 I also don't know why, but it likes to include the function or struct name in the comments above its definition. However, after looking at other Golang projects, I see that this is common.
 
 When the service is handling the request, and if there is a HTML template to serve, if the read file operation fails, it returns the error via the HTTP response. I am unsure if we want this, as it will expose information about the system. Should it just return a generic 500 error message and log the error for the admin to note.
+
+## Database Migrations
+
+For initializing the database, the AI started with just having the SQL commands as a string in Go and initialized the database on start-up (`CREATE TABLE IF NOT EXISTS`). This is fine for the start of the project (make it work, make it right, make it fast), but I would like to change the database schema as the project develops.
+
+I asked the AI to use the common [golang-migrate](https://github.com/golang-migrate/migrate) project for database migrations.
 
 # Appendix
 
