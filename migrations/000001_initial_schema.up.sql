@@ -1,16 +1,4 @@
-package database
-
-// DEPRECATED: This file is kept for reference only.
-//
-// All schema definitions have been migrated to migration files in the migrations/ directory.
-// The schema below represents the initial schema that was migrated to:
-//   - migrations/000001_initial_schema.up.sql (apply)
-//   - migrations/000001_initial_schema.down.sql (rollback)
-//
-// For schema changes, create new migration files instead of modifying these constants.
-// See migrations/README.md for instructions on creating new migrations.
-
-const createRequestLogsTable = `
+-- Create request_logs table
 CREATE TABLE IF NOT EXISTS request_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -40,11 +28,9 @@ CREATE TABLE IF NOT EXISTS request_logs (
     response_status INTEGER NOT NULL,
     response_template TEXT
 );
-`
 
-const createIndexes = `
+-- Create indexes
 CREATE INDEX IF NOT EXISTS idx_timestamp ON request_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_source_ip ON request_logs(source_ip);
 CREATE INDEX IF NOT EXISTS idx_service_name ON request_logs(service_name);
 CREATE INDEX IF NOT EXISTS idx_path ON request_logs(path);
-`

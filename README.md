@@ -104,6 +104,97 @@ Find potential attack attempts:
 sqlite3 data/service-spoof.db "SELECT source_ip, COUNT(*) as attempts FROM request_logs GROUP BY source_ip ORDER BY attempts DESC;"
 ```
 
+### Database Migrations
+
+Service Spoof uses [golang-migrate](https://github.com/golang-migrate/migrate) for database schema management. Migrations are automatically applied when the application starts.
+
+#### How It Works
+
+- Migration files are stored in the [migrations/](migrations/) directory
+- Each migration has two files: `.up.sql` (apply changes) and `.down.sql` (rollback changes)
+- The application automatically runs pending migrations on startup
+- Migration history is tracked in the `schema_migrations` table
+- **Existing databases are fully compatible** - migrations detect and preserve existing data
+
+#### Migration Status
+
+Check the current migration version in the application logs:
+
+```
+Database initialized at ./data/service-spoof.db (migration version: 1)
+```
+
+Or query the database directly:
+
+```bash
+sqlite3 data/service-spoof.db "SELECT version, dirty FROM schema_migrations;"
+```
+
+#### Adding New Migrations
+
+1. Create new migration files in [migrations/](migrations/) using the next sequence number:
+
+```bash
+# Example: Adding a new column
+migrations/000002_add_user_agent_index.up.sql
+migrations/000002_add_user_agent_index.down.sql
+```
+
+2. Write the up migration ([migrations/000002_add_user_agent_index.up.sql](migrations/000002_add_user_agent_index.up.sql)):
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_user_agent ON request_logs(user_agent);
+```
+
+3. Write the down migration ([migrations/000002_add_user_agent_index.down.sql](migrations/000002_add_user_agent_index.down.sql)):
+
+```sql
+DROP INDEX IF EXISTS idx_user_agent;
+```
+
+4. Restart the application - migrations run automatically
+
+For detailed migration guidelines and best practices, see [migrations/README.md](migrations/README.md).
+
+#### Manual Migration Management
+
+Install the migrate CLI tool:
+
+```bash
+go install -tags 'sqlite3' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+```
+
+Common commands:
+
+```bash
+# Check current version
+migrate -path ./migrations -database "sqlite3://./data/service-spoof.db" version
+
+# Apply all pending migrations
+migrate -path ./migrations -database "sqlite3://./data/service-spoof.db" up
+
+# Rollback one migration
+migrate -path ./migrations -database "sqlite3://./data/service-spoof.db" down 1
+
+# Force set version (recovery only)
+migrate -path ./migrations -database "sqlite3://./data/service-spoof.db" force 1
+```
+
+#### Troubleshooting
+
+**Dirty State**: If a migration fails partway through, the database may be marked as "dirty":
+
+```bash
+# Fix by forcing to the last known good version
+migrate -path ./migrations -database "sqlite3://./data/service-spoof.db" force 1
+```
+
+**Migration Not Applied**: Ensure migration files follow the naming convention:
+- Format: `{version}_{description}.{up|down}.sql`
+- Example: `000001_initial_schema.up.sql`
+
+For more troubleshooting help, see [migrations/README.md](migrations/README.md).
+
 ## Architecture
 
 ```
@@ -116,6 +207,7 @@ service-spoof/
 │   ├── middleware/                  # HTTP middleware
 │   ├── service/                     # Service implementations
 │   └── server/                      # Multi-port server manager
+├── migrations/                      # Database migration files
 └── services/                        # Response templates
 ```
 

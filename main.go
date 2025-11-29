@@ -29,11 +29,20 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := db.Initialize(); err != nil {
-		log.Fatalf("Failed to create database schema: %v", err)
+	// Run database migrations
+	if err := db.RunMigrations("./migrations"); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
 	}
 
-	log.Printf("Database initialized at %s", cfg.Database.Path)
+	// Log migration version
+	version, dirty, err := db.GetMigrationVersion()
+	if err != nil {
+		log.Printf("Warning: could not get migration version: %v", err)
+	} else if dirty {
+		log.Fatalf("Database is in dirty state at version %d", version)
+	} else {
+		log.Printf("Database initialized at %s (migration version: %d)", cfg.Database.Path, version)
+	}
 
 	// Create request logger
 	requestLogger := database.NewRequestLogger(db)
