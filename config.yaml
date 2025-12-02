@@ -3,6 +3,10 @@ version: "1.0"
 database:
   path: "./data/service-spoof.db"
 
+tls:
+  certFilePath: "./cert.pem"
+  keyFilePath: "./key.pem"
+
 services:
   # Apache 2.4 Service
   - name: "apache2"

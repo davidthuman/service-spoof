@@ -3,3 +3,6 @@ data/
 service-spoof
 
 .DS_Store
+
+cert.pem
+key.pem

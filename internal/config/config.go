@@ -9,14 +9,21 @@ import (
 
 // Config represents the main configuration structure
 type Config struct {
-	Version  string         `yaml:"version"`
-	Database DatabaseConfig `yaml:"database"`
+	Version  string          `yaml:"version"`
+	Database DatabaseConfig  `yaml:"database"`
+	Tls      TlsConfig       `yaml:"tls"`
 	Services []ServiceConfig `yaml:"services"`
 }
 
 // DatabaseConfig holds database-related configuration
 type DatabaseConfig struct {
 	Path string `yaml:"path"`
+}
+
+// TlsConfig holds tls-related configuration
+type TlsConfig struct {
+	CertFilePath string `yaml:"certFilePath"`
+	KeyFilePath  string `yaml:"keyFilePath"`
 }
 
 // ServiceConfig represents a single service configuration
