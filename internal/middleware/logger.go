@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 
 	"github.com/davidthuman/service-spoof/internal/database"
+	"github.com/davidthuman/service-spoof/internal/fingerprint"
 	"github.com/davidthuman/service-spoof/internal/service"
 )
 
@@ -42,6 +43,7 @@ func Logger(requestLogger *database.RequestLogger, svc service.Service, serverPo
 			}
 
 			// Log to stdout (preserve existing behavior)
+			log.Println(*r.Context().Value(fingerprint.JA4).(*string))
 			log.Println(r.RemoteAddr, string(dump))
 
 			// Wrap the response writer to capture status code

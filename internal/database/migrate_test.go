@@ -51,11 +51,6 @@ func TestRunMigrations_ExistingDatabase(t *testing.T) {
 		t.Fatalf("Failed to create database: %v", err)
 	}
 
-	// Use old Initialize method to create schema
-	if err := db.Initialize(); err != nil {
-		t.Fatalf("Failed to initialize: %v", err)
-	}
-
 	// Insert test data
 	_, err = db.conn.Exec(`INSERT INTO request_logs
 		(source_ip, source_port, server_port, service_name, service_type,
@@ -249,11 +244,6 @@ func TestMigration_PreservesData(t *testing.T) {
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
-	}
-
-	// Initialize with old method
-	if err := db.Initialize(); err != nil {
-		t.Fatalf("Failed to initialize: %v", err)
 	}
 
 	// Insert multiple test records

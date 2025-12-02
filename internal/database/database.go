@@ -41,31 +41,6 @@ func New(path string) (*DB, error) {
 	}, nil
 }
 
-// Initialize creates the database schema
-//
-// DEPRECATED: Use RunMigrations() instead.
-// This method is kept for backward compatibility and reference only.
-// All new schema changes should be managed through migration files in the migrations/ directory.
-//
-// Example migration usage:
-//
-//	if err := db.RunMigrations("./migrations"); err != nil {
-//	    log.Fatalf("Failed to run migrations: %v", err)
-//	}
-func (db *DB) Initialize() error {
-	// Create the request_logs table
-	if _, err := db.conn.Exec(createRequestLogsTable); err != nil {
-		return fmt.Errorf("failed to create request_logs table: %w", err)
-	}
-
-	// Create indexes
-	if _, err := db.conn.Exec(createIndexes); err != nil {
-		return fmt.Errorf("failed to create indexes: %w", err)
-	}
-
-	return nil
-}
-
 // Close closes the database connection
 func (db *DB) Close() error {
 	if db.conn != nil {

@@ -10,13 +10,13 @@ Add contributions made by Claude Code will have the commit author as Claude (usi
 
 I do want to remain in the development process, both to adjust any plans or code and so I can fully understand everything that is going on within the project. I do not want to "vibe-code".
 
-## The Start
+## The Start (AI)
 
 I already has a very simple Golang program that spoofed an Apache web-servers's 400 response page. I was able to log / dump the request.
 
 I told Claude my overall goal for this project, it asked some questions, I answered, and then it went off. After the code generation and a couple compiler errors, it was able to build and run the program for some small testing.
 
-## After AI Generation
+## After AI Generation (Human)
 
 After a plan and code is generating, I will commit the AI generated code. I will then go and review this code to fully understand it and make manual adjustments as I see fit.\
 
@@ -30,11 +30,15 @@ I also don't know why, but it likes to include the function or struct name in th
 
 When the service is handling the request, and if there is a HTML template to serve, if the read file operation fails, it returns the error via the HTTP response. I am unsure if we want this, as it will expose information about the system. Should it just return a generic 500 error message and log the error for the admin to note.
 
-## Database Migrations
+## Database Migrations (AI)
 
 For initializing the database, the AI started with just having the SQL commands as a string in Go and initialized the database on start-up (`CREATE TABLE IF NOT EXISTS`). This is fine for the start of the project (make it work, make it right, make it fast), but I would like to change the database schema as the project develops.
 
 I asked the AI to use the common [golang-migrate](https://github.com/golang-migrate/migrate) project for database migrations.
+
+## JA4 Fingerprint (Human)
+
+To get a better understanding of the clients that could be accessing these spoofed services, I wanted to implement [JA4 fingerprinting](https://foxio.io/ja4).
 
 # Appendix
 

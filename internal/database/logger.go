@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/davidthuman/service-spoof/internal/fingerprint"
 )
 
 // RequestLogger handles logging HTTP requests to the database
@@ -24,6 +26,7 @@ type RequestLog struct {
 	Timestamp        time.Time
 	SourceIP         string
 	SourcePort       int
+	JA4Fingerprint   string
 	ServerPort       int
 	ServiceName      string
 	ServiceType      string
@@ -66,15 +69,18 @@ func (rl *RequestLogger) LogRequest(
 	// Get user agent
 	userAgent := r.Header.Get("User-Agent")
 
+	// Get connection fingerprint from request context
+	fingerprint := r.Context().Value(fingerprint.JA4)
+
 	// Insert into database
 	query := `
 		INSERT INTO request_logs (
-			timestamp, source_ip, source_port, server_port,
+			timestamp, source_ip, source_port, fingerprint, server_port,
 			service_name, service_type,
 			method, path, protocol, host, user_agent,
 			headers, body, raw_request,
 			response_status, response_template
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = rl.db.conn.Exec(
@@ -82,6 +88,7 @@ func (rl *RequestLogger) LogRequest(
 		time.Now(),
 		sourceIP,
 		sourcePort,
+		fingerprint,
 		serverPort,
 		serviceName,
 		serviceType,

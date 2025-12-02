@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 
@@ -85,7 +86,26 @@ func (m *Manager) Start(ctx context.Context) error {
 
 			log.Printf("Starting server on port %d (services: %v)", port, m.getServiceNames(port))
 
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			// Configure for TLS-based fingerprinting
+			listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+			if err != nil {
+				errChan <- err
+			}
+			defer listener.Close()
+
+			// Wrap the listener to intercept connections
+			wrappedListener := &middleware.TlsClientHelloListener{listener}
+
+			// Pass connection fingerprint to request
+			srv.ConnContext = middleware.ConnContextFingerprint
+
+			if m.config.Tls.CertFilePath != "" {
+				err = srv.ServeTLS(wrappedListener, m.config.Tls.CertFilePath, m.config.Tls.KeyFilePath)
+			} else {
+				err = srv.Serve(wrappedListener)
+			}
+
+			if err != nil && err != http.ErrServerClosed {
 				errChan <- fmt.Errorf("server on port %d failed: %w", port, err)
 			}
 		}(port, server)
