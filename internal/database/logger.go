@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/davidthuman/service-spoof/internal/fingerprint"
 )
 
 // RequestLogger handles logging HTTP requests to the database
@@ -37,6 +39,15 @@ type RequestLog struct {
 	RawRequest       string
 	ResponseStatus   int
 	ResponseTemplate string
+
+	// JA4 Fingerprinting fields
+	JA4Fingerprint string
+	JA4PartA       string
+	JA4PartB       string
+	JA4PartC       string
+	TLSVersion     string
+	TLSSNI         string
+	TLSCipherCount int
 }
 
 // LogRequest logs an HTTP request to the database
@@ -48,6 +59,7 @@ func (rl *RequestLogger) LogRequest(
 	responseStatus int,
 	responseTemplate string,
 	rawDump []byte,
+	ja4 *fingerprint.JA4Fingerprint,
 ) error {
 	// Parse source IP and port
 	sourceIP, sourcePort := parseRemoteAddr(r.RemoteAddr)
@@ -66,6 +78,25 @@ func (rl *RequestLogger) LogRequest(
 	// Get user agent
 	userAgent := r.Header.Get("User-Agent")
 
+	// Extract JA4 fields
+	ja4Fingerprint := ""
+	ja4PartA := ""
+	ja4PartB := ""
+	ja4PartC := ""
+	tlsVersion := ""
+	tlsSNI := ""
+	tlsCipherCount := 0
+
+	if ja4 != nil {
+		ja4Fingerprint = ja4.Raw
+		ja4PartA = ja4.PartA
+		ja4PartB = ja4.PartB
+		ja4PartC = ja4.PartC
+		tlsVersion = ja4.TLSVersion
+		tlsSNI = ja4.SNI
+		tlsCipherCount = ja4.CipherCount
+	}
+
 	// Insert into database
 	query := `
 		INSERT INTO request_logs (
@@ -73,8 +104,10 @@ func (rl *RequestLogger) LogRequest(
 			service_name, service_type,
 			method, path, protocol, host, user_agent,
 			headers, body, raw_request,
-			response_status, response_template
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			response_status, response_template,
+			ja4_fingerprint, ja4_part_a, ja4_part_b, ja4_part_c,
+			tls_version, tls_sni, tls_cipher_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = rl.db.conn.Exec(
@@ -95,6 +128,13 @@ func (rl *RequestLogger) LogRequest(
 		string(rawDump),
 		responseStatus,
 		responseTemplate,
+		ja4Fingerprint,
+		ja4PartA,
+		ja4PartB,
+		ja4PartC,
+		tlsVersion,
+		tlsSNI,
+		tlsCipherCount,
 	)
 
 	if err != nil {

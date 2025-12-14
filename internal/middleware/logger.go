@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 
 	"github.com/davidthuman/service-spoof/internal/database"
+	"github.com/davidthuman/service-spoof/internal/fingerprint"
 	"github.com/davidthuman/service-spoof/internal/service"
 )
 
@@ -30,7 +31,7 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 // Logger creates a logging middleware for a specific service
-func Logger(requestLogger *database.RequestLogger, svc service.Service, serverPort int) func(http.Handler) http.Handler {
+func Logger(requestLogger *database.RequestLogger, svc service.Service, serverPort int, ja4Store *fingerprint.JA4Store) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Dump the full HTTP request
@@ -57,6 +58,12 @@ func Logger(requestLogger *database.RequestLogger, svc service.Service, serverPo
 			// Call the next handler
 			next.ServeHTTP(wrappedWriter, r)
 
+			// Extract JA4 fingerprint from store
+			var ja4 *fingerprint.JA4Fingerprint
+			if ja4Store != nil {
+				ja4 = ja4Store.Get(r.RemoteAddr)
+			}
+
 			// Log to database
 			err = requestLogger.LogRequest(
 				r,
@@ -66,6 +73,7 @@ func Logger(requestLogger *database.RequestLogger, svc service.Service, serverPo
 				wrappedWriter.statusCode,
 				template,
 				dump,
+				ja4,
 			)
 			if err != nil {
 				log.Printf("Error logging request to database: %v", err)

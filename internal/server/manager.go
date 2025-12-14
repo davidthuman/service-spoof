@@ -2,13 +2,16 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/davidthuman/service-spoof/internal/config"
 	"github.com/davidthuman/service-spoof/internal/database"
+	"github.com/davidthuman/service-spoof/internal/fingerprint"
 	"github.com/davidthuman/service-spoof/internal/middleware"
 	"github.com/davidthuman/service-spoof/internal/service"
 )
@@ -19,6 +22,7 @@ type Manager struct {
 	services map[int][]service.Service
 	logger   *database.RequestLogger
 	config   *config.Config
+	ja4Store *fingerprint.JA4Store
 }
 
 // NewManager creates a new server manager
@@ -28,6 +32,34 @@ func NewManager(cfg *config.Config, logger *database.RequestLogger) (*Manager, e
 		services: make(map[int][]service.Service),
 		logger:   logger,
 		config:   cfg,
+	}
+
+	// Initialize JA4 store with 5-minute TTL
+	m.ja4Store = fingerprint.NewJA4Store(5 * time.Minute)
+
+	// Configure TLS if certificates are provided
+	var tlsConfig *tls.Config
+	if cfg.Tls.CertFilePath != "" && cfg.Tls.KeyFilePath != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.Tls.CertFilePath, cfg.Tls.KeyFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load TLS certificates: %w", err)
+		}
+
+		tlsConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+				// Generate JA4 fingerprint
+				ja4 := fingerprint.GenerateJA4(hello)
+
+				// Store fingerprint keyed by remote address
+				if hello.Conn != nil {
+					m.ja4Store.Set(hello.Conn.RemoteAddr().String(), ja4)
+				}
+
+				// Return nil to use default config
+				return nil, nil
+			},
+		}
 	}
 
 	// Build port-to-service mapping
@@ -59,14 +91,15 @@ func NewManager(cfg *config.Config, logger *database.RequestLogger) (*Manager, e
 			// Create middleware chain
 			var handler http.Handler = http.HandlerFunc(primaryService.HandleRequest)
 			handler = middleware.ServiceHeaders(primaryService)(handler)
-			handler = middleware.Logger(logger, primaryService, port)(handler)
+			handler = middleware.Logger(logger, primaryService, port, m.ja4Store)(handler)
 
 			mux.Handle("/", handler)
 		}
 
 		m.servers[port] = &http.Server{
-			Addr:    fmt.Sprintf(":%d", port),
-			Handler: mux,
+			Addr:      fmt.Sprintf(":%d", port),
+			Handler:   mux,
+			TLSConfig: tlsConfig,
 		}
 	}
 
@@ -85,8 +118,15 @@ func (m *Manager) Start(ctx context.Context) error {
 
 			log.Printf("Starting server on port %d (services: %v)", port, m.getServiceNames(port))
 
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				errChan <- fmt.Errorf("server on port %d failed: %w", port, err)
+			// Determine if this server should use TLS
+			if srv.TLSConfig != nil {
+				if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+					errChan <- fmt.Errorf("server on port %d failed: %w", port, err)
+				}
+			} else {
+				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					errChan <- fmt.Errorf("server on port %d failed: %w", port, err)
+				}
 			}
 		}(port, server)
 	}
@@ -132,6 +172,11 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	var errors []error
 	for err := range errChan {
 		errors = append(errors, err)
+	}
+
+	// Close JA4 store cleanup goroutine
+	if m.ja4Store != nil {
+		m.ja4Store.Close()
 	}
 
 	if len(errors) > 0 {
