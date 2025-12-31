@@ -40,5 +40,38 @@ I asked the AI to use the common [golang-migrate](https://github.com/golang-migr
 
 To get a better understanding of the clients that could be accessing these spoofed services, I wanted to implement [JA4 fingerprinting](https://foxio.io/ja4).
 
-# Appendix
+## JA4 Fingerprint (Human)
 
+To get a better understanding of the clients that could be accessing these spoofed services, I wanted to implement [JA4 fingerprinting](https://foxio.io/ja4).
+
+My implement works as follows:
+
+- For each service / port used, a `net.Listener` is created to listen for TCP connects on the port. This listener is wrapped to augment the `Accept` function of the listener to create a custom `TlsClientHelloConn` with an augmented `Read` function that will parse the incoming bytes for a complete ClientHello message that can be parsed for the JA4 fingerprint.
+- The `ConnContext` parameter on each `http.Server` is set to a function that pulled the parsed fingerprint from the `net.Conn` structure.
+- The database logger gets the fingerprint value from the request context.
+- A `fingerprint` column was added to the `request_logs` table.
+
+## Claude Code Implementation of JA4 Fingerprinting
+
+I asked Claude Code to do that following while on the same [base commit for my implementation](https://github.com/davidthuman/service-spoof/commit/9e3435ec9529321d51b64629766da405cda800a9).
+
+> I would like you to implement the JA4 fingerprint into the request data that we capture. That following features should be includes:
+> 
+> - Full JA4 fingerprint parsing from TLS Client Hello messages
+> - Connection-level interception to capture raw TLS handshake bytes
+> - JA4 fingerprints stored in database with indexed queries
+> - Integration with request logging middleware
+> - Proper TLS version mapping, GREASE filtering, and hash truncation
+
+With proper planning it produced the following implementation.
+
+- Added JA4 fingerprint and component columns to the `request_logs` table.
+- Implemented an in-memory key-value data store `JA4Store` so request loggers / handlers can get the JA4 fingerprint that has been parsed for its associated request. The key for the store is the request's remote address
+- Creates a custom `tls.Config` configured with the certificate key pairs, and a `GetConfigForClient` function for being able to capture the Client Hello message
+- Creates a JA4 fingerprint parser that takes in a `*tls.ClientHelloInfo` structure.
+
+Critques of the Implementation
+
+- JA4 fingerprint parser using the `tls.ClientHelloInfo` does not provide all the data necessary to generate the real fingerprint
+  - The implementation does note that certain fingerprint features are approximate without parsing the raw ClientHello message
+- The in-memory key-value data store to pass the parsed JA4 fingerprint to the associated HTTP request handler / logger seems over-engineered.
